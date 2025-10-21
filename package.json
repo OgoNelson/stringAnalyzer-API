@@ -1,0 +1,26 @@
+{
+  "name": "stringanalyzer-api",
+  "version": "1.0.0",
+  "description": "A RESTful API service that analyzes strings and stores their computed properties.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Ogo Nelosn",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "lowdb": "^7.0.1",
+    "nanoid": "^5.1.6"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  }
+}
