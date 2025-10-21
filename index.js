@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-//app.use("/strings", stringsRouter);
+app.use("/strings", stringsRouter);
 
 // Root and health
 app.get("/", (req, res) =>
