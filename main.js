@@ -19,12 +19,9 @@ app.get("/health", (req, res) =>
   res.status(200).json({ status: "success", message: "OK" })
 );
 
-// Error handler (simple)
-app.use((err, req, res, next) => {
-  console.error(err);
-  if (!res.headersSent) {
-    res.status(500).json({ status: "error", message: "Internal Server Error" });
-  }
+// Fallback for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ error: "Not Found" });
 });
 
 module.exports = app;

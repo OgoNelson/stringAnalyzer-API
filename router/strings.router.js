@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const stringController = require("../controller/strings.controller");
 
-router.post("/", stringController.createString);
+router.post("/", stringController.analyzeString);
 router.get("/", stringController.getAllStrings);
 router.get(
   "/filter-by-natural-language",
