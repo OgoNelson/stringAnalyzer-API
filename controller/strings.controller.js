@@ -1,22 +1,69 @@
 const stringService = require("../service/strings.service");
+const crypto = require("crypto");
+const db = new Map(); // temporary in-memory store
+
+const analyzeString = (req, res) => {
+  try {
+    const { value } = req.body;
+    if (value === undefined) {
+      return res.status(400).json({ error: "Missing 'value' field" });
+    }
+    if (typeof value !== "string") {
+      return res.status(422).json({ error: "'value' must be a string" });
+    }
+
+    const hash = crypto.createHash("sha256").update(value).digest("hex");
+    if (db.has(hash)) {
+      return res.status(409).json({ error: "String already exists" });
+    }
+
+    const cleaned = value.replace(/\s+/g, " ");
+    const properties = {
+      length: cleaned.length,
+      is_palindrome:
+        cleaned.toLowerCase().replace(/\s+/g, "") ===
+        cleaned.toLowerCase().replace(/\s+/g, "").split("").reverse().join(""),
+      unique_characters: new Set(cleaned.replace(/\s+/g, "").toLowerCase())
+        .size,
+      word_count: cleaned.trim().split(/\s+/).length,
+      sha256_hash: hash,
+      character_frequency_map: [...cleaned.toLowerCase()].reduce((acc, ch) => {
+        if (ch !== " ") acc[ch] = (acc[ch] || 0) + 1;
+        return acc;
+      }, {}),
+    };
+
+    const data = {
+      id: hash,
+      value,
+      properties,
+      created_at: new Date().toISOString(),
+    };
+
+    db.set(hash, data);
+    return res.status(201).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 
 // POST /strings
-const createString = (req, res) => {
-  const { value } = req.body;
-  if (value === undefined) {
-    return res.status(400).json({ error: "Missing 'value' field" });
-  }
-  if (typeof value !== "string") {
-    return res.status(422).json({ error: "'value' must be a string" });
-  }
+// const createString = (req, res) => {
+//   const { value } = req.body;
+//   if (value === undefined) {
+//     return res.status(404).json({ error: "Missing 'value' field" });
+//   }
+//   if (typeof value !== "string") {
+//     return res.status(422).json({ error: "'value' must be a string" });
+//   }
 
-  const result = stringService.saveString(value);
-  if (result.error) {
-    return res.status(result.status).json({ error: result.error });
-  }
+//   const result = stringService.saveString(value);
+//   if (result.error) {
+//     return res.status(result.status).json({ error: result.error });
+//   }
 
-  return res.status(201).json(result.data);
-};
+//   return res.status(201).json(result.data);
+// };
 
 // GET /strings/:value
 const getString = (req, res) => {
@@ -30,109 +77,105 @@ const getString = (req, res) => {
 
 // GET /strings (with filters)
 const getAllStrings = (req, res) => {
-  const filters = {};
+  try {
+    const {
+      is_palindrome,
+      min_length,
+      max_length,
+      word_count,
+      contains_character,
+    } = req.query;
 
-  if (req.query.is_palindrome !== undefined) {
-    if (
-      req.query.is_palindrome !== "true" &&
-      req.query.is_palindrome !== "false"
-    ) {
-      return res.status(400).json({ error: "Invalid value for is_palindrome" });
-    }
-    filters.is_palindrome = req.query.is_palindrome === "true";
+    let results = [...db.values()];
+
+    if (is_palindrome !== undefined)
+      results = results.filter(
+        (s) => s.properties.is_palindrome === (is_palindrome === "true")
+      );
+    if (min_length)
+      results = results.filter(
+        (s) => s.properties.length >= parseInt(min_length)
+      );
+    if (max_length)
+      results = results.filter(
+        (s) => s.properties.length <= parseInt(max_length)
+      );
+    if (word_count)
+      results = results.filter(
+        (s) => s.properties.word_count === parseInt(word_count)
+      );
+    if (contains_character)
+      results = results.filter((s) =>
+        s.value.toLowerCase().includes(contains_character.toLowerCase())
+      );
+
+    res.status(200).json({
+      data: results,
+      count: results.length,
+      filters_applied: req.query,
+    });
+  } catch (error) {
+    res.status(400).json({ error: "Invalid query parameters" });
   }
-
-  if (req.query.min_length) filters.min_length = parseInt(req.query.min_length);
-  if (req.query.max_length) filters.max_length = parseInt(req.query.max_length);
-  if (req.query.word_count) filters.word_count = parseInt(req.query.word_count);
-  if (req.query.contains_character)
-    filters.contains_character = req.query.contains_character;
-
-  const result = stringService.getAllStrings(filters);
-  return res.status(200).json(result);
 };
+
 
 // GET /strings/filter-by-natural-language
 const filterByNaturalLanguage = (req, res) => {
   const { query } = req.query;
-  if (!query || typeof query !== "string") {
-    return res
-      .status(400)
-      .json({ error: "Missing or invalid 'query' parameter" });
+  if (!query) return res.status(400).json({ error: "Missing query parameter" });
+
+  const lower = query.toLowerCase();
+  const filters = {};
+
+  if (lower.includes("palindromic")) filters.is_palindrome = true;
+  if (lower.includes("single word")) filters.word_count = 1;
+  if (lower.match(/longer than (\d+)/))
+    filters.min_length = parseInt(lower.match(/longer than (\d+)/)[1]);
+  if (lower.includes("containing the letter")) {
+    const match = lower.match(/letter (\w)/);
+    if (match) filters.contains_character = match[1];
   }
 
-  const parsedFilters = {};
-  const q = query.toLowerCase();
-
-  try {
-    // Palindrome detection
-    if (q.includes("palindrome") || q.includes("palindromic")) {
-      parsedFilters.is_palindrome = true;
-    }
-
-    // Word count
-    if (q.includes("single word") || q.includes("one word")) {
-      parsedFilters.word_count = 1;
-    } else if (q.match(/(\d+)\s*word/)) {
-      const match = q.match(/(\d+)\s*word/);
-      parsedFilters.word_count = parseInt(match[1]);
-    }
-
-
-    // Length filters
-    if (q.includes("longer than")) {
-      const match = q.match(/longer than (\d+)/);
-      if (match) parsedFilters.min_length = parseInt(match[1]) + 1;
-    } else if (q.includes("shorter than")) {
-      const match = q.match(/shorter than (\d+)/);
-      if (match) parsedFilters.max_length = parseInt(match[1]) - 1;
-    }
-
-    // Contains character
-    const charMatch = q.match(/letter\s+([a-z])/);
-    if (charMatch) {
-      parsedFilters.contains_character = charMatch[1];
-    }
-
-    // If we couldn’t parse anything meaningful
-    if (Object.keys(parsedFilters).length === 0) {
-      return res.status(400).json({
-        error: "Unable to parse natural language query",
-      });
-    }
-
-    const result = require("../service/strings.service").getAllStrings(
-      parsedFilters
+  let results = [...db.values()];
+  if (filters.is_palindrome)
+    results = results.filter((s) => s.properties.is_palindrome);
+  if (filters.word_count)
+    results = results.filter(
+      (s) => s.properties.word_count === filters.word_count
+    );
+  if (filters.min_length)
+    results = results.filter((s) => s.properties.length > filters.min_length);
+  if (filters.contains_character)
+    results = results.filter((s) =>
+      s.value.toLowerCase().includes(filters.contains_character)
     );
 
-    res.status(200).json({
-      data: result.data,
-      count: result.count,
-      interpreted_query: {
-        original: query,
-        parsed_filters: parsedFilters,
-      },
-    });
-  } catch (err) {
-    res.status(422).json({
-      error: "Query parsed but resulted in conflict",
-      details: err.message,
-    });
-  }
+  return res.status(200).json({
+    data: results,
+    count: results.length,
+    interpreted_query: {
+      original: query,
+      parsed_filters: filters,
+    },
+  });
 };
+
 
 // DELETE /strings/:value
 const deleteString = (req, res) => {
-  const { value } = req.params;
-  const result = stringService.deleteString(value);
-  if (result.error) {
-    return res.status(result.status).json({ error: result.error });
-  }
+  const value = req.params.string_value;
+  const hash = crypto.createHash("sha256").update(value).digest("hex");
+
+  if (!db.has(hash)) return res.status(404).json({ error: "Not Found" });
+
+  db.delete(hash);
   return res.status(204).send();
 };
 
+
 module.exports = {
-  createString,
+  analyzeString,
   getString,
   getAllStrings,
   filterByNaturalLanguage,
