@@ -88,5 +88,33 @@
       }
     },
     "created_at": "2025-10-21T13:49:19.310Z"
+  },
+  {
+    "id": "e5066bba8e0704f367a8fea36a5f37a8b5f7f6c9bdc9a113bc17372186e71b5e",
+    "value": "madam anna civic level rotor kayak",
+    "properties": {
+      "length": 34,
+      "is_palindrome": false,
+      "unique_characters": 14,
+      "word_count": 6,
+      "sha256_hash": "e5066bba8e0704f367a8fea36a5f37a8b5f7f6c9bdc9a113bc17372186e71b5e",
+      "character_frequency_map": {
+        "m": 2,
+        "a": 6,
+        "d": 1,
+        "n": 2,
+        "c": 2,
+        "i": 2,
+        "v": 2,
+        "l": 2,
+        "e": 2,
+        "r": 2,
+        "o": 2,
+        "t": 1,
+        "k": 2,
+        "y": 1
+      }
+    },
+    "created_at": "2025-10-22T09:09:36.081Z"
   }
 ]
